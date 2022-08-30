@@ -37,6 +37,36 @@ For this reason, there is no basic "install process", only guidelines for use.
 
 
 
+## OpenSSL Bash Script | create_cert
+
+The directory contains two bash scripts.
+
+### Certificate Creation | openssl_certificate.sh
+
+This script references a number of input variables to create a self-signed certificate.
+
+
+
+| Variable               | Description                                                  |
+| ---------------------- | ------------------------------------------------------------ |
+| VAR_PREREQ_SOFTWARE    | List of packages to check for, default is only openssl       |
+| VAR_CERT_COUNTRYNAME   | Two digit country name (i.e. US, or CA)                      |
+| VAR_CERT_STATEPROVINCE | Full name of State or Province                               |
+| VAR_CERT_LOCALITY      | Locality, such as city or area                               |
+| VAR_CERT_ORGNAME       | Organizations full Name                                      |
+| VAR_CERT_OU            | Organizational Unit/Department                               |
+| VAR_CERT_COMMONNAME    | Common Name, does not have to be a fqdn for this purpose     |
+| VAR_CERT_CN            | fqdn                                                         |
+| VAR_CERT_OU2           | Additional OU that is used for authentication validation (i.e. home) |
+
+The certificate is created by providing variables and executing the script.  The sample scripts/configuration files included in this repository may reference the created artifacts, however it is recommended that the script be cusomtized with desired output location.
+
+### Clean Up | cleanup.sh
+
+Simple script that will remove any generated certificate files from testing. 
+
+
+
 ### AWS CLI
 
 Q: Why do we include AWS CLI, when our preferred method is using IaC?
@@ -87,5 +117,9 @@ This is a simple deployment script, for deployment.  It accepts a small set of v
 | VAR_IAMPATH            | The path for the role. It must begin and end with a forward slash |
 | VAR_IAMROLEDESCRIPTION | A short, friendly desription for the Role. i.e. "Dev Pipeline Role" |
 
+The sample script will then:
 
++ Create the IAM Role
++ Attach the IAM Policies to the IAM Role
++ Create the RolesAnywhere Trust Anchor with the x509 certificate data
 
