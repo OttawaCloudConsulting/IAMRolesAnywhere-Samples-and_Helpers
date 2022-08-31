@@ -9,7 +9,6 @@ resource "tls_private_key" "ca" {
 
 resource "tls_self_signed_cert" "ca" {
   private_key_pem       = tls_private_key.ca.private_key_pem
-  key_algorithm     = tls_private_key.ca.algorithm
   is_ca_certificate     = true
   set_authority_key_id  = true
   set_subject_key_id    = true
@@ -49,8 +48,7 @@ resource "local_file" "server_key" {
 }
 
 resource "tls_cert_request" "cert" {
-  key_algorithm   = "tls_private_key.cert.algorithm
-  private_key_pem = "tls_private_key.cert.private_key_pem
+  private_key_pem = tls_private_key.cert.private_key_pem
 
   subject {
     common_name         = var.tls.common_name
@@ -63,9 +61,7 @@ resource "tls_cert_request" "cert" {
 }
 
 resource "tls_locally_signed_cert" "cert" {
-  cert_request_pem = tls_cert_request.cert.cert_request_pem
-
-  ca_key_algorithm   = tls_private_key.ca.algorithm
+  cert_request_pem   = tls_cert_request.cert.cert_request_pem
   ca_private_key_pem = tls_private_key.ca.private_key_pem
   ca_cert_pem        = tls_self_signed_cert.ca.cert_pem
 
@@ -73,7 +69,6 @@ resource "tls_locally_signed_cert" "cert" {
   allowed_uses = [
     "digital_signature"
   ]
-}
 }
 
 resource "local_file" "server_pem" {
