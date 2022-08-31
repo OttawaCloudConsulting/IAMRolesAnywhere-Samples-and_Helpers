@@ -1,103 +1,92 @@
-resource "tls_private_key" "authority_key" {
+# 1. Generate an elliptic curve key for the certificate authority:
+# $> openssl ecparam -genkey -name secp384r1 -out rootCA.key
+resource "tls_private_key" "rootCA_key" {
   algorithm   = "ECDSA"
-  ecdsa_curve = "P384"
+  ecdsa_curve = "P521"
 }
 
-resource "tls_cert_request" "ca_cert" {
-  private_key_pem = tls_private_key.authority_key.private_key_pem
+# 3. Create the CSR for the CA certificate:
+# openssl req -new -key rootCA.key -out rootCA.req -nodes -config root_request.config
+
+resource "tls_cert_request" "rootCA_req" {
+  private_key_pem = tls_private_key.rootCA_key.private_key_pem
   subject {
-    country             = "CA"
-    province            = "Ontario"
-    locality            = "Ottawa"
-    organization        = "My Company Inc"
-    organizational_unit = "home"
-    common_name         = "example.com"
+    common_name         = "Acme CA"
+    country             = "US"
+    locality            = "New York"
+    organization        = "Acme Inc."
+    organizational_unit = "AC"
+    province            = "NY"
   }
 }
 
-# resource "tls_locally_signed_cert" "this" {
-#   # cert_request_pem   = tls_cert_request.this.cert_request_pem
-#   # ca_private_key_pem = tls_cert_request.this.private_key_pem
-#   ca_cert_pem        = tls_cert_request.this.
+# 6. Create the CA certificate (answer yes to all prompts):
+# openssl ca -out rootCA.pem -keyfile rootCA.key -selfsign -config root_certificate.config  -in rootCA.req
 
-#   validity_period_hours = 26280
-#   is_ca_certificate     = true
-#   allowed_uses = [
-#     "cert_signing",
-#     "crl_signing",
-#     "digital_signature"
-#   ]
-# }
-
-resource "tls_self_signed_cert" "ca_cert" {
-  private_key_pem       = tls_cert_request.ca_cert.private_key_pem
-  validity_period_hours = 26280
+resource "tls_self_signed_cert" "rootCA_pem" {
+  private_key_pem       = tls_private_key.rootCA_key.private_key_pem
   is_ca_certificate     = true
+  set_authority_key_id  = true
+  set_subject_key_id    = true
+  validity_period_hours = 26280
+  subject {
+    common_name         = "Acme CA"
+    country             = "US"
+    locality            = "New York"
+    organization        = "Acme Inc."
+    organizational_unit = "AC"
+    province            = "NY"
+  }
   allowed_uses = [
     "cert_signing",
-    "crl_signing",
-    "digital_signature"
+    "digital_signature",
+    "crl_signing"
   ]
-  subject {
-    country             = "CA"
-    province            = "Ontario"
-    locality            = "Ottawa"
-    organization        = "My Company Inc"
-    organizational_unit = "home"
-    common_name         = "example.com"
-  }
-}
-
-# output to server.key
-resource "tls_private_key" "client_key" {
-  algorithm   = "ECDSA"
-  ecdsa_curve = "P384"
-}
-
-resource "tls_cert_request" "client_cert" {
-  private_key_pem = tls_private_key.client_key.private_key_pem
-  subject {
-    country             = "CA"
-    province            = "Ontario"
-    locality            = "Ottawa"
-    organization        = "My Company Inc"
-    organizational_unit = "home"
-    common_name         = "example.com"
-  }
-}
-
-# output to server.pem
-resource "tls_locally_signed_cert" "client_cert" {
-  cert_request_pem   = tls_cert_request.client_cert.cert_request_pem
-  ca_private_key_pem = tls_private_key.authority_key.private_key_pem
-  ca_cert_pem        = tls_self_signed_cert.ca_cert.cert_pem
-
-  validity_period_hours = 26280
-
-  allowed_uses = [
-    "digital_signature"
-  ]
-}
-
-# output "server_key" {
-#   value = tls_private_key.client_key.public_key_pem
-# }
-
-# output "server_pem" {
-#   value = tls_locally_signed_cert.client_cert.cert_pem
-# }
-
-resource "local_file" "server_key" {
-  content  = tls_private_key.client_key.public_key_pem
-  filename = "${path.module}/server.key"
-}
-
-resource "local_file" "server_pem" {
-  content  = tls_private_key.client_key.public_key_pem
-  filename = "${path.module}/server.pem"
 }
 
 resource "local_file" "rootca_pem" {
-  content = tls_self_signed_cert.ca_cert.cert_pem
+  content  = tls_self_signed_cert.rootCA_pem.cert_pem
   filename = "${path.module}/rootCA.pem"
 }
+
+# 8. Create the client key:
+# openssl ecparam -genkey -name secp384r1 -out server.key
+
+resource "tls_private_key" "server_key" {
+  algorithm   = "ECDSA"
+  ecdsa_curve = "P521"
+}
+
+# 10. Create the client CSR:
+# openssl req -new -sha512 -nodes -key server.key -out server.csr -config server_request.config
+resource "tls_cert_request" "server_csr" {
+  private_key_pem = tls_private_key.server_key.private_key_pem
+
+  subject {
+    common_name         = "Acme.com"
+    country             = "US"
+    organization        = "Acme Inc."
+    organizational_unit = "Innovation"
+  }
+}
+
+# 12. Create the CA signed client certificate: + create server.pem output file
+# openssl x509 -req -sha512 -days 365 -in server.csr -CA rootCA.pem -CAkey rootCA.key -CAcreateserial -out server.pem -extfile server_cert.config
+resource "tls_locally_signed_cert" "server_pem" {
+  cert_request_pem   = tls_cert_request.server_csr.cert_request_pem
+  ca_private_key_pem = tls_self_signed_cert.rootCA_pem.private_key_pem
+  ca_cert_pem        = tls_self_signed_cert.rootCA_pem.cert_pem
+  #tls_cert_request.server_csr.private_key_pem
+
+  validity_period_hours = 26280
+
+  allowed_uses = [
+    "digital_signature"
+  ]
+}
+
+resource "local_file" "server_pem" {
+  content  = tls_locally_signed_cert.server_pem.ca_cert_pem
+  filename = "${path.module}/server.pem"
+}
+
