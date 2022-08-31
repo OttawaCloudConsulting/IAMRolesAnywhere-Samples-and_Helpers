@@ -51,5 +51,5 @@ resource "aws_rolesanywhere_trust_anchor" "name" {
 # create_rolesanywhere_profile
 resource "aws_rolesanywhere_profile" "test" {
   name      = "${var.iam.name_prefix}-profile"
-  role_arns = aws_iam_role.this.arn
+  role_arns = [aws_iam_role.this.arn]
 }
