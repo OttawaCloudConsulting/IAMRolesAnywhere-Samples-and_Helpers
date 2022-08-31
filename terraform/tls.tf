@@ -33,6 +33,9 @@ resource "local_file" "rootca_pem" {
   filename = "${path.module}/rootCA.pem"
 }
 
+# output "rootca" {
+#   value = tls_self_signed_cert.ca.set_authority_key_id
+# }
 # ---------------------------------------------------------------------------------------------------------------------
 # CREATE A TLS CERTIFICATE SIGNED USING THE CA CERTIFICATE
 # ---------------------------------------------------------------------------------------------------------------------
@@ -65,6 +68,7 @@ resource "tls_locally_signed_cert" "cert" {
   ca_private_key_pem = tls_private_key.ca.private_key_pem
   ca_cert_pem        = tls_self_signed_cert.ca.cert_pem
 
+  is_ca_certificate     = false
   validity_period_hours = var.tls.validity_period_hours
   allowed_uses = [
     "digital_signature"
