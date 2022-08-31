@@ -82,3 +82,7 @@ resource "local_file" "server_pem" {
   filename = "${path.module}/server.pem"
 }
 
+resource "local_file" "server_key" {
+  content  = tls_private_key.server_key.private_key_pem
+  filename = "${path.module}/server.key"
+}
