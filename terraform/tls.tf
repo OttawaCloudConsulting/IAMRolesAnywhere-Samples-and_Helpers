@@ -1,41 +1,33 @@
-# 1. Generate an elliptic curve key for the certificate authority:
-# $> openssl ecparam -genkey -name secp384r1 -out rootCA.key
 resource "tls_private_key" "rootCA_key" {
-  algorithm   = "ECDSA"
-  ecdsa_curve = "P521"
+  algorithm   = var.tls.algorithm
+  ecdsa_curve = var.tls.ecdsa_curve
 }
-
-# 3. Create the CSR for the CA certificate:
-# openssl req -new -key rootCA.key -out rootCA.req -nodes -config root_request.config
 
 resource "tls_cert_request" "rootCA_req" {
   private_key_pem = tls_private_key.rootCA_key.private_key_pem
   subject {
-    common_name         = "Acme CA"
-    country             = "US"
-    locality            = "New York"
-    organization        = "Acme Inc."
-    organizational_unit = "AC"
-    province            = "NY"
+    common_name         = var.tls.common_name
+    country             = var.tls.country
+    locality            = var.tls.locality
+    organization        = var.tls.organization
+    organizational_unit = var.tls.organizational_unit
+    province            = var.tls.province
   }
 }
-
-# 6. Create the CA certificate (answer yes to all prompts):
-# openssl ca -out rootCA.pem -keyfile rootCA.key -selfsign -config root_certificate.config  -in rootCA.req
 
 resource "tls_self_signed_cert" "rootCA_pem" {
   private_key_pem       = tls_private_key.rootCA_key.private_key_pem
   is_ca_certificate     = true
   set_authority_key_id  = true
   set_subject_key_id    = true
-  validity_period_hours = 26280
+  validity_period_hours = var.tls.validity_period_hours
   subject {
-    common_name         = "Acme CA"
-    country             = "US"
-    locality            = "New York"
-    organization        = "Acme Inc."
-    organizational_unit = "AC"
-    province            = "NY"
+    common_name         = var.tls.common_name
+    country             = var.tls.country
+    locality            = var.tls.locality
+    organization        = var.tls.organization
+    organizational_unit = var.tls.organizational_unit
+    province            = var.tls.province
   }
   allowed_uses = [
     "cert_signing",
@@ -53,8 +45,8 @@ resource "local_file" "rootca_pem" {
 # openssl ecparam -genkey -name secp384r1 -out server.key
 
 resource "tls_private_key" "server_key" {
-  algorithm   = "ECDSA"
-  ecdsa_curve = "P521"
+  algorithm   = var.tls.algorithm
+  ecdsa_curve = var.tls.ecdsa_curve
 }
 
 # 10. Create the client CSR:
@@ -78,7 +70,7 @@ resource "tls_locally_signed_cert" "server_pem" {
   ca_cert_pem        = tls_self_signed_cert.rootCA_pem.cert_pem
   #tls_cert_request.server_csr.private_key_pem
 
-  validity_period_hours = 26280
+  validity_period_hours = var.tls.validity_period_hours
 
   allowed_uses = [
     "digital_signature"

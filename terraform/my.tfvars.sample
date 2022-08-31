@@ -1,0 +1,20 @@
+iam = {
+  role_description = "IAM Anywhere Sample Role"
+  session_duration = 36000
+  name_prefix      = "my-AnywhereRole"
+  path             = "/opsrole/"
+  x509Subject_OU   = "home"
+  managed_policy   = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
+tls = {
+  algorithm             = "ECDSA"
+  ecdsa_curve           = "P521"
+  common_name           = "Acme CA"
+  country               = "US"
+  locality              = "New York"
+  organization          = "Acme Inc."
+  organizational_unit   = "AC"
+  province              = "NY"
+  validity_period_hours = 26280
+}
