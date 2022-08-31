@@ -43,10 +43,13 @@ resource "aws_rolesanywhere_trust_anchor" "name" {
   source {
     source_type = "CERTIFICATE_BUNDLE"
     source_data {
-      x509_certificate_data = 
+      x509_certificate_data = local_file.server_pem.content
     }
   }
 }
 
 # create_rolesanywhere_profile
-
+resource "aws_rolesanywhere_profile" "test" {
+  name      = "my-AnywhereRole-profile"
+  role_arns = aws_iam_role.this.arn
+}
