@@ -57,12 +57,11 @@ This guide describes the IAM Roles Anywhere operations that you can call program
 
 This repo will include code examples for IAM RolesAnywhere deployment with:
 
-+ OpenSSL Bash Scripts to generate Certificates
-+ AWS CLI Deployment Sample
++ [OpenSSL Bash Scripts to generate Certificates](#openssl-bash-script--create_cert)
++ [AWS CLI Deployment Sample](#aws-cli)
 + ~~AWS CloudFormation Sample~~
-+ Terraform AWS Provider Sample
-+ Bash IAM RolesAnywhere Authentication Sample
-+ Sample Sign-In Helper script
++ [Terraform AWS Provider Sample](#terraform)
++ [Bash IAM RolesAnywhere Authentication Sample](#authenticating-to-iam-rolesanywhere)
 
 
 
