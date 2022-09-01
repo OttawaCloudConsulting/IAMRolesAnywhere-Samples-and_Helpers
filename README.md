@@ -21,6 +21,9 @@
       - [Outputs | outputs.tf](#outputs--outputstf)
   - [Authenticating to IAM RolesAnywhere](#authenticating-to-iam-rolesanywhere)
 
+## Test & Validation Results
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=OttawaCloudConsulting_IAMRolesAnywhere-Samples-and_Helpers&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=OttawaCloudConsulting_IAMRolesAnywhere-Samples-and_Helpers)
+
 ## Overview
 
 Our intended audience assumes an existing understanding of AWS IAM Services, and experience with the provided template configuration languages.
