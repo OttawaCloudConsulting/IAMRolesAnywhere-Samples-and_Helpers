@@ -3,6 +3,7 @@
 - [IAM RolesAnywhere Examples](#iam-rolesanywhere-examples)
   - [Overview](#overview)
     - [AWS Documentation](#aws-documentation)
+    - [IAM RolesAnywhere Quotas](#iam-rolesanywhere-quotas)
   - [Code Coverage](#code-coverage)
   - [Repo Structure](#repo-structure)
   - [OpenSSL Bash Script | create_cert](#openssl-bash-script--create_cert)
@@ -18,12 +19,15 @@
       - [server.key and server.pem](#serverkey-and-serverpem)
     - [IAM and IAM RolesAnywhere | iam.tf](#iam-and-iam-rolesanywhere--iamtf)
       - [Outputs | outputs.tf](#outputs--outputstf)
+  - [Authenticating to IAM RolesAnywhere](#authenticating-to-iam-rolesanywhere)
 
 ## Overview
 
 Our intended audience assumes an existing understanding of AWS IAM Services, and experience with the provided template configuration languages.
 
 No experience/knowledge with tls certificates is required, although it is useful for providing enhanced security.
+
+We recommend fully reviewing [IAM RolesAnywhere Security](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/security.html) documentation to create a mature and secure solution
 
 
 ### [AWS Documentation](https://docs.aws.amazon.com/rolesanywhere/latest/APIReference/Welcome.html)
@@ -33,6 +37,21 @@ AWS Identity and Access Management Roles Anywhere provides a secure way for your
 To use IAM Roles Anywhere, your workloads must use X.509 certificates issued by their certificate authority (CA) . You register the CA with IAM Roles Anywhere as a trust anchor to establish trust between your public key infrastructure (PKI) and IAM Roles Anywhere. If you don't manage your own PKI system, you can use AWS Certificate Manager Private Certificate Authority to create a CA and then use that to establish trust with IAM Roles Anywhere.
 
 This guide describes the IAM Roles Anywhere operations that you can call programmatically. For more information about IAM Roles Anywhere, see the IAM Roles Anywhere User Guide.
+
+### [IAM RolesAnywhere Quotas](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/load-balancer-limits.html)
+
+| Resource                               | Description                                                  | Default value | Adjustable |
+| -------------------------------------- | ------------------------------------------------------------ | ------------- | ---------- |
+| Combined rate of trust anchor requests | The maximum transactions per second for  ListTrustAnchors, CreateTrustAnchor, GetTrustAnchor, UpdateTrustAnchor,  DeleteTrustAnchor, EnableTrustAnchor, and DisableTrustAnchor requests  combined. | 1 per second  | Yes        |
+| Combined rate of profile requests      | The maximum transactions per second for  ListProfiles, CreateProfile, GetProfile, UpdateProfile, DeleteProfile,  EnableProfile, and DisableProfile requests combined. | 1 per second  | Yes        |
+| Combined rate of subject requests      | The maximum transactions per second for ListSubjects and GetSubject requests combined. | 1 per second  | Yes        |
+| Combined rate of tagging requests      | The maximum transactions per second for TagResource, UntagResource, and ListTagsForResource requests combined. | 1 per second  | Yes        |
+| Combined rate of CRL requests          | The maximum transactions per second for  ListCrls, GetCrl, ImportCrl, UpdateCrl, DeleteCrl, EnableCrl, and  DisableCrl requests combined. | 1 per second  | Yes        |
+| Rate of CreateSession requests         | The maximum transactions per second for CreateSession requests. | 10 per second | Yes        |
+| Trust anchors                          | The maximum number of trust anchors that you can create within an account. | 50            | Yes        |
+| Profiles                               | The maximum number of profiles that you can create within an account. | 250           | Yes        |
+| CRLs per trust anchor                  | The maximum number of Certificate Revocation Lists (CRLs) that you can create per trust anchor within an account. | 2             | No         |
+| Certificates per trust anchor          | The maximum number of certificates that you can create per trust anchor within an account. | 2             | No         |
 
 ## Code Coverage 
 
@@ -266,4 +285,43 @@ output "iam_role" {
   value = aws_iam_role.this.arn
 }
 ```
+
+
+
+## Authenticating to IAM RolesAnywhere
+
+[AWS Source Documentation](https://docs.aws.amazon.com/rolesanywhere/latest/userguide/credential-helper.html)
+
+AWS Provides the `aws_signing_helper` tool that provides an easy to use CLI method for obtaining temporary credentials for login.
+
+We provide a sample shell script for using this tool to generate a temporary credential set with the generated certificates.
+
+The shell script needs the relevant IAM Role and IAM RolesAnywhere ARN's provided to it as variables:
+
+```shell
+VAR_TRUST_ANCHOR_ARN=""
+VAR_PROFILE_ARN=""
+VAR_ROLE_ARN=""
+```
+
+The shell script contains a simple function to authenticate with:
+
++ update `--certificate` with the path to your own `server.pem` file
++ update the `--private-key` with the path to your own `server.key` file
+
+```shell
+get-credentials () {
+  ./aws_signing_helper credential-process \
+    --certificate ./terraform/server.pem --private-key ./terraform/server.key \
+    --trust-anchor-arn "$VAR_TRUST_ANCHOR_ARN" \
+    --profile-arn "$VAR_PROFILE_ARN" \
+    --role-arn "$VAR_ROLE_ARN"
+}
+```
+
+Once the variables are updated, and then certificate and private-key locations corrected, the script can be executed.
+
+By default it will only `echo` the obtained keys into the shell session. We do provide a function export them also, but it is important to remember these are designed as sample templates and by default the session authentication remains in the executed sub shell.
+
+![IAMRolesAnywhere_iamanywhere_authentication](./images/IAMRolesAnywhere_iamanywhere_authentication.png)
 
