@@ -1,15 +1,38 @@
 # IAM RolesAnywhere Examples
 
 - [IAM RolesAnywhere Examples](#iam-rolesanywhere-examples)
+  - [Overview](#overview)
+    - [AWS Documentation](#aws-documentation)
   - [Code Coverage](#code-coverage)
   - [Repo Structure](#repo-structure)
   - [OpenSSL Bash Script | create_cert](#openssl-bash-script--create_cert)
     - [Certificate Creation | openssl_certificate.sh](#certificate-creation--openssl_certificatesh)
     - [Clean Up | cleanup.sh](#clean-up--cleanupsh)
-    - [AWS CLI](#aws-cli)
+  - [AWS CLI](#aws-cli)
     - [Custom Trust Policy | custom_trust_policy.json](#custom-trust-policy--custom_trust_policyjson)
     - [IAM Anywhere deployment script | iam_anywhere.sh](#iam-anywhere-deployment-script--iam_anywheresh)
-      - [Variables](#variables)
+  - [Terraform](#terraform)
+    - [File Structure](#file-structure)
+    - [Certificate Management | tls.tf](#certificate-management--tlstf)
+      - [rootCA.pem](#rootcapem)
+      - [server.key and server.pem](#serverkey-and-serverpem)
+    - [IAM and IAM RolesAnywhere | iam.tf](#iam-and-iam-rolesanywhere--iamtf)
+      - [Outputs | outputs.tf](#outputs--outputstf)
+
+## Overview
+
+Our intended audience assumes an existing understanding of AWS IAM Services, and experience with the provided template configuration languages.
+
+No experience/knowledge with tls certificates is required, although it is useful for providing enhanced security.
+
+
+### [AWS Documentation](https://docs.aws.amazon.com/rolesanywhere/latest/APIReference/Welcome.html)
+
+AWS Identity and Access Management Roles Anywhere provides a secure way for your workloads such as servers, containers, and applications that run outside of AWS to obtain temporary AWS credentials. Your workloads can use the same IAM policies and roles you have for native AWS applications to access AWS resources. Using IAM Roles Anywhere eliminates the need to manage long-term credentials for workloads running outside of AWS.
+
+To use IAM Roles Anywhere, your workloads must use X.509 certificates issued by their certificate authority (CA) . You register the CA with IAM Roles Anywhere as a trust anchor to establish trust between your public key infrastructure (PKI) and IAM Roles Anywhere. If you don't manage your own PKI system, you can use AWS Certificate Manager Private Certificate Authority to create a CA and then use that to establish trust with IAM Roles Anywhere.
+
+This guide describes the IAM Roles Anywhere operations that you can call programmatically. For more information about IAM Roles Anywhere, see the IAM Roles Anywhere User Guide.
 
 ## Code Coverage 
 
@@ -18,7 +41,7 @@ This repo will include code examples for IAM RolesAnywhere deployment with:
 + OpenSSL Bash Scripts to generate Certificates
 + AWS CLI Deployment Sample
 + ~~AWS CloudFormation Sample~~
-+ ~~Terraform AWS Provider Sample~~
++ Terraform AWS Provider Sample
 + Bash IAM RolesAnywhere Authentication Sample
 + Sample Sign-In Helper script
 
@@ -70,7 +93,7 @@ Simple script that will remove any generated certificate files from testing.
 
 
 
-### AWS CLI
+## AWS CLI
 
 Q: Why do we include AWS CLI, when our preferred method is using IaC?
 
@@ -110,7 +133,6 @@ For our example, we have added a Condition for StringEquals to ensure our certif
 
 This is a simple deployment script, for deployment.  It accepts a small set of variables to generate the requried resources.
 
-#### Variables
 
 | Variables              | Description                                                  |
 | ---------------------- | ------------------------------------------------------------ |
@@ -125,4 +147,123 @@ The sample script will then:
 + Create the IAM Role
 + Attach the IAM Policies to the IAM Role
 + Create the RolesAnywhere Trust Anchor with the x509 certificate data
++ Create the RolesAnywhere Profile and associates it with the IAM Role
+
+
+
+## Terraform
+
+The Terraform samples utilizes three providers to create an end-to-end deployment skeleton:
+
++ [hashicorp/aws](https://registry.terraform.io/providers/hashicorp/aws/latest)
++ [hashicorp/local](https://registry.terraform.io/providers/hashicorp/local/latest)
++ [hashicorp/tls](https://registry.terraform.io/providers/hashicorp/tls/latest)
+
+
+
+### File Structure
+
+| Filename         | Description                                                  |
+| ---------------- | ------------------------------------------------------------ |
+| iam.tf           | Configuration file that creates IAM and IAM RolesAnywhere resources |
+| my.tfvars.sample | Sample of tfvars for consumption by terraform                |
+| terraform.tf     | Terraform and Providers configuration                        |
+| tls.tf           | Configuration file that creates the certificates             |
+| variables.tf     | Configuration file that defines the variables                |
+
+### Certificate Management | tls.tf
+
+Certificate Management is handled via the tls.tf configuration file, creating self-signed certificates.
+
+We output three key certificate files. Two files are use by the `aws_signing_helper` helper binary, and one file is consumed within the terraform. 
+
+The direct export of files to local disk is a design artifact of providing sample templates, and a better practice would be to utilize externalized vault storage (i.e. parameter store) for these values to manage risk.
+
+#### rootCA.pem
+
+The file rootCA.pem is created in tls.tf
+
+```hcl
+resource "local_file" "rootca_pem" {
+  content  = tls_self_signed_cert.ca.cert_pem
+  filename = "${path.module}/rootCA.pem"
+}
+```
+
+This is then consumed within the iam.tf configuration file to be associated with the trust anchor
+
+```hcl
+resource "aws_rolesanywhere_trust_anchor" "name" {
+  enabled = true
+  name    = "${var.iam.name_prefix}-anchor"
+  source {
+    source_type = "CERTIFICATE_BUNDLE"
+    source_data {
+      x509_certificate_data = local_file.rootca_pem.content
+    }
+  }
+}
+```
+
+#### server.key and server.pem
+
+These two files are generated for consumption by the `aws_signing_helper` script.
+
+```hcl
+resource "local_file" "server_key" {
+  content  = tls_private_key.cert.private_key_pem
+  filename = "${path.module}/server.key"
+}
+
+resource "local_file" "server_pem" {
+  content  = tls_locally_signed_cert.cert.cert_pem
+  filename = "${path.module}/server.pem"
+}
+```
+
+The `aws_signing_helper` script uses these for `--certificate` and `--private-key` parameters
+
+```shell
+  ./aws_signing_helper credential-process \
+    --certificate ./terraform/server.pem --private-key ./terraform/server.key \
+    --trust-anchor-arn "$VAR_TRUST_ANCHOR_ARN" \
+    --profile-arn "$VAR_PROFILE_ARN" \
+    --role-arn "$VAR_ROLE_ARN"
+```
+
+
+
+### IAM and IAM RolesAnywhere | iam.tf
+
+The template provide generates a single IAM Role as an example, and associates the ReadOnly managed IAM Policy to it.
+
+IAM RolesAnywhere Trust Anchor is created, and matched to the x509 certificate created in the tls.tf configuration file, then an IAM RolesAnywhere Profile is associated to the IAM Role originally generated.
+
+The ARN's for for these three resources are required for the `aws_signing_helper` script.
+
+
+
+#### Outputs | outputs.tf
+
+The `aws_signing_helper` requires three variables for authentication.
+
++ IAM RolesAnywhere Trust Anchor ARN
++ IAM RolesAnywhere Profile ARN
++ IAM Role ARN
+
+For external integration, our templates includes these as specific Terraform Outputs
+
+```hcl
+output "trust_anchor_arn" {
+  value = aws_rolesanywhere_trust_anchor.name.arn
+}
+
+output "trust_profile_arn" {
+  value = aws_rolesanywhere_profile.test.arn
+}
+
+output "iam_role" {
+  value = aws_iam_role.this.arn
+}
+```
 
